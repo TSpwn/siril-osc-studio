@@ -1,0 +1,116 @@
+############################################
+#
+# Script for Siril 1.4.x
+# OSC_Full_Color v1.0
+#
+######## OSC FULL COLOR (BROADBAND) ########
+#
+# One-Shot-Color (OSC) full pipeline for a
+# broadband target: calibration, registration,
+# stacking, then automatic post-processing up
+# to a stretched 16-bit TIFF.
+#
+# Needs 4 sets of RAW/FITS images in the working
+# directory, within 4 directories:
+#   biases/
+#   flats/
+#   darks/
+#   lights/
+# Masters are written to ./masters/
+#
+# Outputs (in the working directory):
+#   result.fit            -> linear stack (raw, "as the original script")
+#   result_processed.tif  -> processed 16-bit TIFF
+#
+############################################
+
+requires 1.4.0
+
+# ==========================================================
+#  FIXED STEPS 1-3 : calibration / registration / stacking
+#  (logic taken verbatim from the stock OSC_Preprocessing.ssf)
+# ==========================================================
+
+# --- Convert Bias Frames to .fit files ---
+cd biases
+convert bias -out=../process
+cd ../process
+
+# --- Stack Bias Frames to bias_stacked.fit ---
+stack bias rej 3 3 -nonorm -out=../masters/bias_stacked
+cd ..
+
+# --- Convert Flat Frames to .fit files ---
+cd flats
+convert flat -out=../process
+cd ../process
+
+# --- Calibrate Flat Frames ---
+calibrate flat -bias=../masters/bias_stacked
+
+# --- Stack Flat Frames to pp_flat_stacked.fit ---
+stack pp_flat rej 3 3 -norm=mul -out=../masters/pp_flat_stacked
+cd ..
+
+# --- Convert Dark Frames to .fit files ---
+cd darks
+convert dark -out=../process
+cd ../process
+
+# --- Stack Dark Frames to dark_stacked.fit ---
+stack dark rej 3 3 -nonorm -out=../masters/dark_stacked
+cd ..
+
+# --- Convert Light Frames to .fit files ---
+cd lights
+convert light -out=../process
+cd ../process
+
+# --- Calibrate Light Frames (dark + flat, cosmetic corr., debayer) ---
+calibrate light -dark=../masters/dark_stacked -flat=../masters/pp_flat_stacked -cc=dark -cfa -equalize_cfa -debayer
+
+# --- Register (align) the calibrated lights ---
+register pp_light
+
+# --- Stack to the linear result ---
+stack r_pp_light rej 3 3 -norm=addscale -output_norm -rgb_equal -32b -out=result
+
+# ==========================================================
+#  STEP 4 : save the raw LINEAR stack as result.fit
+# ==========================================================
+load result
+# Fix orientation only if the frame is stored bottom-up
+mirrorx -bottomup
+# result.fit in the working directory = the raw linear file to reprocess by hand
+save ../result
+
+# ==========================================================
+#  AUTOMATIC POST-PROCESSING (linear -> non-linear)
+#  Order is critical: color-calibrate on LINEAR data,
+#  BEFORE stretching.
+# ==========================================================
+
+# --- 5. Gradient / sky background removal (light pollution) ---
+#     degree 1 = linear plane, robust (flats already fixed the vignetting)
+subsky 1
+
+# --- 6. Photometric color calibration (SPCC) ---
+#     SPCC needs an astrometric solution: plate-solve FIRST.
+#     'spcc' with no argument reuses the settings last configured
+#     in the SPCC GUI tool (sensor / filter / white reference).
+platesolve
+spcc
+
+# --- 7. Remove the green cast (SCNR) ---
+rmgreen
+
+# --- 8. Automatic stretch -> switch to non-linear ---
+#     -linked is MANDATORY after color calibration: the unlinked
+#     version would alter the white balance set by SPCC.
+autostretch -linked
+
+# --- 9. Save the final 16-bit TIFF ---
+savetif ../result_processed
+
+cd ..
+close

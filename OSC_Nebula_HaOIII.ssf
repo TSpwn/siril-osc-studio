@@ -1,0 +1,126 @@
+############################################
+#
+# Script for Siril 1.4.x
+# OSC_Nebula_HaOIII v1.0
+#
+######## OSC NARROWBAND (DUAL-BAND) ########
+#
+# One-Shot-Color (OSC) pipeline for a narrowband
+# target shot through a DUAL-BAND filter.
+# Extracts the Ha and OIII layers from the color
+# data, stacks each, then composes an HOO image
+# (R=Ha, G=OIII, B=OIII) and post-processes it up
+# to a stretched 16-bit TIFF.
+#
+# Needs 4 sets of RAW/FITS images in the working
+# directory, within 4 directories:
+#   biases/
+#   flats/
+#   darks/
+#   lights/
+# Masters are written to ./masters/
+#
+# Outputs (in the working directory):
+#   result.fit            -> linear HOO composite (raw)
+#   result_processed.tif  -> processed 16-bit TIFF
+#
+############################################
+
+requires 1.4.0
+
+# ==========================================================
+#  FIXED STEPS 1-3 : calibration / registration / stacking
+#  (logic taken verbatim from the stock OSC_Extract_HaOIII.ssf)
+# ==========================================================
+
+# --- Convert Bias Frames to .fit files ---
+cd biases
+convert bias -out=../process
+cd ../process
+
+# --- Stack Bias Frames to bias_stacked.fit ---
+stack bias rej 3 3 -nonorm -out=../masters/bias_stacked
+cd ..
+
+# --- Convert Flat Frames to .fit files ---
+cd flats
+convert flat -out=../process
+cd ../process
+
+# --- Calibrate Flat Frames ---
+calibrate flat -bias=../masters/bias_stacked
+
+# --- Stack Flat Frames to pp_flat_stacked.fit ---
+stack pp_flat rej 3 3 -norm=mul -out=../masters/pp_flat_stacked
+cd ..
+
+# --- Convert Dark Frames to .fit files ---
+cd darks
+convert dark -out=../process
+cd ../process
+
+# --- Stack Dark Frames to dark_stacked.fit ---
+stack dark rej 3 3 -nonorm -out=../masters/dark_stacked
+cd ..
+
+# --- Convert Light Frames to .fit files ---
+cd lights
+convert light -out=../process
+cd ../process
+
+# --- Calibrate Light Frames (NO debayer: extraction works on CFA data) ---
+calibrate light -dark=../masters/dark_stacked -flat=../masters/pp_flat_stacked -cc=dark -cfa -equalize_cfa
+
+# --- Extract Ha and OIII layers from the calibrated CFA lights ---
+seqextract_HaOIII pp_light -resample=ha
+
+# --- Align Ha lights, then stack ---
+register Ha_pp_light
+stack r_Ha_pp_light rej 3 3 -norm=addscale -output_norm -32b -out=results_00001
+mirrorx_single results_00001
+
+# --- Align OIII lights, then stack ---
+register OIII_pp_light
+stack r_OIII_pp_light rej 3 3 -norm=addscale -output_norm -32b -out=results_00002
+mirrorx_single results_00002
+
+# --- Align the two stacks together (small shifts / chromatic aberration) ---
+register results -transf=shift -interp=none
+
+# --- Renormalize OIII onto Ha statistics (PixelMath) ---
+#     This is the narrowband channel-balancing step; it stands in for
+#     photometric color calibration, which is not meaningful on a
+#     synthetic HOO composite (see the note delivered with the scripts).
+pm $r_results_00002$*mad($r_results_00001$)/mad($r_results_00002$)-mad($r_results_00001$)/mad($r_results_00002$)*median($r_results_00002$)+median($r_results_00001$)
+save OIII_renorm
+
+# ==========================================================
+#  STEP 4 : compose the linear HOO image and save result.fit
+#  R = Ha, G = OIII, B = OIII
+# ==========================================================
+rgbcomp r_results_00001 OIII_renorm OIII_renorm -out=result
+load result
+# result.fit in the working directory = the raw linear HOO composite
+save ../result
+
+# ==========================================================
+#  AUTOMATIC POST-PROCESSING adapted to narrowband
+#  (linear -> non-linear)
+# ==========================================================
+
+# --- 5. Gradient / sky background removal (light pollution) ---
+subsky 1
+
+# --- 7. Remove the green cast (cleans green stars on the HOO palette) ---
+#     Note: on HOO this also shifts OIII from teal toward blue.
+#     Remove this line if you want to keep maximum teal OIII.
+rmgreen
+
+# --- 8. Automatic stretch -> switch to non-linear ---
+#     -linked keeps the Ha/OIII color relationship intact.
+autostretch -linked
+
+# --- 9. Save the final 16-bit TIFF ---
+savetif ../result_processed
+
+close
