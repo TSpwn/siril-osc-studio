@@ -1,6 +1,6 @@
 # Siril OSC Studio
 
-**Version 0.1.0 — work in progress 🚧**
+**Version 0.2.0 — work in progress 🚧**
 
 Automated post-processing scripts and a small GUI app for **one-shot-color (OSC)**
 astrophotography in [Siril](https://siril.org) 1.4.x. Takes calibrated frames all
@@ -24,7 +24,7 @@ linéaire, celui-ci fait le reste.*
 |------|--------------|
 | `OSC_Full_Color.ssf` | Broadband color pipeline: calibration → registration → stacking → gradient removal → photometric color calibration (SPCC) → green removal → auto-stretch → 16-bit TIFF. |
 | `OSC_Nebula_HaOIII.ssf` | Narrowband dual-band pipeline: extracts Ha and OIII, stacks each, composes an **HOO** image (R=Ha, G=OIII, B=OIII), then post-processes it. |
-| `OSC_Studio.py` | All-in-one GUI (sirilpy + PyQt6): pick the target type, pick the folder, tick the optional steps, run. Live check of the required subfolders. |
+| `OSC_Studio.py` | All-in-one dark GUI (sirilpy + PyQt6): pick the target type and folder, tick the optional steps, run. Live subfolder check, batch mode, custom output name, progress bar, result preview, remembered settings. |
 
 Every run produces **two files** in the target folder:
 - `result.fit` — the raw **linear** stack (to reprocess by hand),
@@ -71,9 +71,17 @@ reuses those settings afterwards (`spcc` runs with no argument).
   not meaningful on a synthetic HOO composite; channel balancing is done by the
   OIII→Ha renormalisation instead.
 
-### Roadmap (0.1 → next)
+### New in 0.2.0
 
-- Per-step progress bar.
+- Redesigned dark "astro" interface: numbered cards, live Siril connection
+  indicator, cleaner buttons.
+- Batch mode: process several targets in one run (one subfolder per target).
+- Custom output name, live image counter per subfolder, result thumbnail.
+- Non-blocking processing with a progress bar and a Stop button.
+- Settings (folder, target type, steps) remembered between launches.
+
+### Roadmap (next)
+
 - "How to organise my photos" helper with a folder diagram.
 - Optional `spcc -narrowband` variant for dual-band targets.
 - More pipelines (SHO, mono, …) — the app is built around a list of `Pipeline`
@@ -93,7 +101,7 @@ MIT — see [LICENSE](LICENSE).
 |---------|------|
 | `OSC_Full_Color.ssf` | Pipeline couleur large bande : calibration → alignement → empilement → retrait du gradient → calibration couleur photométrique (SPCC) → retrait du vert → étirement auto → TIFF 16-bit. |
 | `OSC_Nebula_HaOIII.ssf` | Pipeline bande étroite dual-band : extrait Ha et OIII, empile chaque couche, compose une image **HOO** (R=Ha, G=OIII, B=OIII), puis post-traite. |
-| `OSC_Studio.py` | App tout-en-un (sirilpy + PyQt6) : choisir le type de cible, le dossier, cocher les étapes, lancer. Vérification en direct des sous-dossiers requis. |
+| `OSC_Studio.py` | App tout-en-un, interface sombre (sirilpy + PyQt6) : choisir le type de cible et le dossier, cocher les étapes, lancer. Vérif en direct des sous-dossiers, mode lot, nom de sortie personnalisé, barre de progression, aperçu, réglages mémorisés. |
 
 Chaque exécution produit **deux fichiers** dans le dossier de la cible :
 - `result.fit` — l'empilement **linéaire** brut (à retraiter à la main),
@@ -142,9 +150,18 @@ Le pipeline couleur réutilise ces réglages ensuite (`spcc` sans argument).
   photométrique n'a pas de sens sur un composite HOO synthétique ; l'équilibrage
   des canaux est fait par la renormalisation OIII→Ha à la place.
 
-### Feuille de route (0.1 → suite)
+### Nouveautés 0.2.0
 
-- Barre de progression par étape.
+- Interface sombre « astro » repensée : cartes numérotées, indicateur de
+  connexion Siril en direct, boutons plus nets.
+- Mode lot : traiter plusieurs cibles d'un coup (un sous-dossier par cible).
+- Nom de sortie personnalisé, compteur d'images par sous-dossier, vignette du
+  résultat.
+- Traitement non bloquant avec barre de progression et bouton Arrêter.
+- Réglages (dossier, type de cible, étapes) mémorisés entre deux lancements.
+
+### Feuille de route (suite)
+
 - Aide « comment ranger mes photos » avec un schéma des dossiers.
 - Variante `spcc -narrowband` optionnelle pour les cibles dual-band.
 - D'autres pipelines (SHO, mono, …) — l'app est bâtie autour d'une liste d'objets
