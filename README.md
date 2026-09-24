@@ -1,172 +1,93 @@
 # Siril OSC Studio
 
-**Version 0.2.0 — work in progress 🚧**
+**Version 0.3.0 🚧**
 
-Automated post-processing scripts and a small GUI app for **one-shot-color (OSC)**
-astrophotography in [Siril](https://siril.org) 1.4.x. Takes calibrated frames all
-the way from raw sub-exposures to a finished, stretched 16-bit TIFF — the stock
-scripts stop at the linear `result.fit`, this goes the rest of the way.
+Traitement guidé pour **caméra couleur (OSC)** dans [Siril](https://siril.org) 1.4.x,
+pensé pour s'enchaîner avec le plugin N.I.N.A. [Mode Débutant](https://github.com/TSpwn/ModeDebutant) :
+on lui donne **le dossier de la nuit tel que N.I.N.A. l'a écrit**, il trouve les
+cibles et va jusqu'au TIFF 16-bit fini.
 
-*Scripts de post-traitement automatisé et une petite app graphique pour
-l'astrophoto **couleur (OSC)** dans Siril 1.4.x. Va des brutes calibrées jusqu'au
-TIFF 16-bit étiré et fini — les scripts d'origine s'arrêtent à `result.fit`
-linéaire, celui-ci fait le reste.*
-
-> 🇬🇧 English below · 🇫🇷 [Version française plus bas](#-français)
-
----
-
-## 🇬🇧 English
-
-### What's included
-
-| File | What it does |
-|------|--------------|
-| `OSC_Full_Color.ssf` | Broadband color pipeline: calibration → registration → stacking → gradient removal → photometric color calibration (SPCC) → green removal → auto-stretch → 16-bit TIFF. |
-| `OSC_Nebula_HaOIII.ssf` | Narrowband dual-band pipeline: extracts Ha and OIII, stacks each, composes an **HOO** image (R=Ha, G=OIII, B=OIII), then post-processes it. |
-| `OSC_Studio.py` | All-in-one dark GUI (sirilpy + PyQt6): pick the target type and folder, tick the optional steps, run. Live subfolder check, batch mode, custom output name, progress bar, result preview, remembered settings. |
-
-Every run produces **two files** in the target folder:
-- `result.fit` — the raw **linear** stack (to reprocess by hand),
-- `result_processed.tif` — the processed **16-bit TIFF**.
-
-### Requirements
-
-- **Siril 1.4.x** (tested on 1.4.4), macOS or Windows.
-- Your frames organised in four subfolders inside the target folder:
-  `lights/`, `darks/`, `flats/`, `biases/`.
-- The GUI needs PyQt6 — it is installed automatically on first launch via Siril's
-  bundled Python (`ensure_installed`).
-
-### Install
-
-1. Copy the three files into a folder of your own (e.g. `Documents/Siril-scripts`).
-   Do **not** put them in Siril's built-in scripts folder.
-2. In Siril: **☰ → Preferences → Scripts**, add that folder, click **Refresh**, **Apply**.
-3. Reload the menu: type `reloadscripts` in the command line (or restart Siril).
-4. The scripts appear under **Scripts → Siril script files** (`.ssf`) and
-   **Scripts → Python scripts** (`OSC_Studio`).
-
-### Use
-
-- **GUI (recommended):** *Scripts → Python scripts → OSC_Studio*. Choose the
-  target type, browse to the target folder, tick/untick steps, **Run**.
-- **Batch (`.ssf`):** set Siril's working directory to the target folder, then
-  click the script. It starts immediately and needs the four subfolders.
-
-### One-time SPCC setup (for correct colors)
-
-Open the **SPCC** tool once in the Siril GUI, set your **sensor** (e.g. Canon R8),
-your **filter** and the **white reference**, and run it once. The color pipeline
-reuses those settings afterwards (`spcc` runs with no argument).
-
-### Notes / design choices
-
-- The order matters: **SPCC runs on linear data, before the stretch**. The final
-  stretch uses `autostretch -linked` — the unlinked version would undo the white
-  balance set by SPCC.
-- `subsky 1` (degree-1 plane) is used for gradient removal — robust, since flats
-  already handle vignetting.
-- The narrowband pipeline deliberately **skips SPCC**: photometric calibration is
-  not meaningful on a synthetic HOO composite; channel balancing is done by the
-  OIII→Ha renormalisation instead.
-
-### New in 0.2.0
-
-- Redesigned dark "astro" interface: numbered cards, live Siril connection
-  indicator, cleaner buttons.
-- Batch mode: process several targets in one run (one subfolder per target).
-- Custom output name, live image counter per subfolder, result thumbnail.
-- Non-blocking processing with a progress bar and a Stop button.
-- Settings (folder, target type, steps) remembered between launches.
-
-### Roadmap (next)
-
-- "How to organise my photos" helper with a folder diagram.
-- Optional `spcc -narrowband` variant for dual-band targets.
-- More pipelines (SHO, mono, …) — the app is built around a list of `Pipeline`
-  objects precisely so it can grow.
-
-### License
-
-MIT — see [LICENSE](LICENSE).
+*Guided processing for one-shot-color cameras in Siril 1.4.x. Point it at the
+night folder written by N.I.N.A.; it finds the targets, adapts the calibration
+to whatever frames exist, and goes all the way to a finished 16-bit TIFF.*
 
 ---
 
 ## 🇫🇷 Français
 
-### Contenu
+### Le principe
 
-| Fichier | Rôle |
-|---------|------|
-| `OSC_Full_Color.ssf` | Pipeline couleur large bande : calibration → alignement → empilement → retrait du gradient → calibration couleur photométrique (SPCC) → retrait du vert → étirement auto → TIFF 16-bit. |
-| `OSC_Nebula_HaOIII.ssf` | Pipeline bande étroite dual-band : extrait Ha et OIII, empile chaque couche, compose une image **HOO** (R=Ha, G=OIII, B=OIII), puis post-traite. |
-| `OSC_Studio.py` | App tout-en-un, interface sombre (sirilpy + PyQt6) : choisir le type de cible et le dossier, cocher les étapes, lancer. Vérif en direct des sous-dossiers, mode lot, nom de sortie personnalisé, barre de progression, aperçu, réglages mémorisés. |
+```
+Astro/                         ← où N.I.N.A. enregistre (ex. C:\Astro)
+├── 2026-09-23/                ← LA NUIT : c'est ce dossier qu'on choisit
+│   ├── LIGHT/                 ← obligatoire
+│   ├── DARK/  FLAT/  BIAS/    ← facultatifs
+│   ├── M81.fit                ← sortie : empilement linéaire
+│   ├── M81_processed.tif      ← sortie : image finie
+│   └── _OSC_Studio/           ← travail intermédiaire (liens, jamais tes originaux)
+└── _Bibliotheque_Darks/       ← masters darks, réutilisés d'une nuit à l'autre
+```
 
-Chaque exécution produit **deux fichiers** dans le dossier de la cible :
-- `result.fit` — l'empilement **linéaire** brut (à retraiter à la main),
-- `result_processed.tif` — le **TIFF 16-bit** traité.
+1. **La nuit** — choisis le dossier daté (ou « 📅 Dernière nuit »). Les compteurs
+   montrent ce qu'il contient.
+2. **Les cibles** — N.I.N.A. range toutes les cibles d'une nuit dans le même
+   `LIGHT/` ; l'app les sépare d'après l'en-tête FITS (cible, pose, gain). Une
+   carte par série, avec ce qu'elle aura : darks, flats, calibration couleur.
+3. **Le traitement** — type de cible, étapes, **Lancer**. Aperçu à la fin.
 
-### Prérequis
+### Seules les photos sont obligatoires
 
-- **Siril 1.4.x** (testé sur 1.4.4), macOS ou Windows.
-- Tes images rangées dans quatre sous-dossiers du dossier de la cible :
-  `lights/`, `darks/`, `flats/`, `biases/`.
-- L'app a besoin de PyQt6 — installé automatiquement au premier lancement via le
-  Python embarqué de Siril (`ensure_installed`).
+| Il manque… | Ce que fait l'app |
+|---|---|
+| Darks | Prend un master de la **bibliothèque** aux mêmes réglages (pose, gain, offset, température). Sinon, sans darks. |
+| Flats | Pas de correction du vignettage ; le retrait du gradient en rattrape une partie. |
+| Bias (avec flats) | **Bias synthétique** calculé depuis l'OFFSET écrit par N.I.N.A. (caméras connues : SV405CC). |
+
+Chaque master dark fabriqué rejoint la bibliothèque : **des darks faits une fois**
+(bouchon + tissu noir, mêmes réglages, même température) servent ensuite à toutes
+les nuits.
+
+### Détails qui comptent
+
+- **Photos pendant le refroidissement écartées** (option) : comparées à la
+  consigne *finale* de la série — N.I.N.A. écrit la consigne intermédiaire de sa
+  rampe dans `SET-TEMP`.
+- **Résolution astrométrique** centrée sur `OBJCTRA/OBJCTDEC` (la cible centrée par
+  N.I.N.A.), pas sur `RA/DEC` (la position que *croit* la monture, fausse de
+  plusieurs degrés sans synchronisation).
+- **SPCC** : capteur reconnu d'après `INSTRUME` (SV405CC → Sony IMX294…). Il faut
+  Internet (Gaia DR3). En cas d'échec, l'image sort quand même.
+- **Gradient** : `subsky -rbf` en couleur (ciel de ville) ; plan de degré 1 en
+  bande étroite (préserve les grandes nébulosités).
+- L'ordre est critique : SPCC sur données **linéaires**, puis `autostretch -linked`.
 
 ### Installation
 
-1. Copie les trois fichiers dans un dossier à toi (ex. `Documents/Siril-scripts`).
-   Ne les mets **pas** dans le dossier des scripts intégrés de Siril.
-2. Dans Siril : **☰ → Préférences → Scripts**, ajoute ce dossier, clique
-   **Refresh**, puis **Apply**.
-3. Recharge le menu : tape `reloadscripts` dans la ligne de commande (ou redémarre Siril).
-4. Les scripts apparaissent sous **Scripts → Fichiers de Scripts Siril** (`.ssf`)
-   et **Scripts → Scripts Python** (`OSC_Studio`).
+1. Copie `OSC_Studio.py` dans un dossier à toi (ex. `Documents/Siril-scripts`).
+2. Siril : **☰ → Préférences → Scripts**, ajoute ce dossier, **Refresh**, **Apply**.
+3. **Scripts → Scripts Python → OSC_Studio**. PyQt6 s'installe tout seul au
+   premier lancement.
 
-### Utilisation
+Les deux `.ssf` (`OSC_Full_Color`, `OSC_Nebula_HaOIII`) restent disponibles pour
+l'ancienne organisation `lights/darks/flats/biases` complète.
 
-- **App (recommandé) :** *Scripts → Scripts Python → OSC_Studio*. Choisis le type
-  de cible, sélectionne le dossier, coche/décoche les étapes, **Lancer**.
-- **Batch (`.ssf`) :** règle le répertoire de travail de Siril sur le dossier de la
-  cible, puis clique le script. Il démarre tout de suite et exige les quatre
-  sous-dossiers.
+### Testé
 
-### Réglage SPCC (une seule fois, pour des couleurs justes)
+Siril 1.4.4, sur les vraies données d'une nuit N.I.N.A. (SV405CC + 135 mm, M81) :
+darks de la nuit, master de bibliothèque, flats + bias synthétique, résolution et
+SPCC (1 219 étoiles). L'interface Qt, elle, n'a pas encore tourné sur macOS.
 
-Ouvre l'outil **SPCC** une fois dans l'interface de Siril, choisis ton **capteur**
-(ex. Canon R8), ton **filtre** et la **référence de blanc**, et lance-le une fois.
-Le pipeline couleur réutilise ces réglages ensuite (`spcc` sans argument).
+---
 
-### Notes / choix de conception
+## 🇬🇧 English (short)
 
-- L'ordre est critique : **SPCC tourne sur des données linéaires, avant l'étirement**.
-  L'étirement final utilise `autostretch -linked` — la version « unlinked »
-  défairait la balance des blancs posée par SPCC.
-- `subsky 1` (plan de degré 1) pour le gradient — robuste, car les flats
-  corrigent déjà le vignettage.
-- Le pipeline bande étroite **saute volontairement SPCC** : la calibration
-  photométrique n'a pas de sens sur un composite HOO synthétique ; l'équilibrage
-  des canaux est fait par la renormalisation OIII→Ha à la place.
+Pick the **night folder** written by N.I.N.A. (`LIGHT/`, optional `DARK/`, `FLAT/`,
+`BIAS/`). Targets are split from FITS headers. Missing darks → matching master from
+`_Bibliotheque_Darks` (filled automatically); missing bias with flats → synthetic
+bias from `OFFSET` (known cameras). Plate solve is centred on `OBJCTRA/OBJCTDEC`,
+SPCC sensor from `INSTRUME`. Outputs `<Target>.fit` and `<Target>_processed.tif`
+in the night folder; your original frames are never modified.
 
-### Nouveautés 0.2.0
+### License
 
-- Interface sombre « astro » repensée : cartes numérotées, indicateur de
-  connexion Siril en direct, boutons plus nets.
-- Mode lot : traiter plusieurs cibles d'un coup (un sous-dossier par cible).
-- Nom de sortie personnalisé, compteur d'images par sous-dossier, vignette du
-  résultat.
-- Traitement non bloquant avec barre de progression et bouton Arrêter.
-- Réglages (dossier, type de cible, étapes) mémorisés entre deux lancements.
-
-### Feuille de route (suite)
-
-- Aide « comment ranger mes photos » avec un schéma des dossiers.
-- Variante `spcc -narrowband` optionnelle pour les cibles dual-band.
-- D'autres pipelines (SHO, mono, …) — l'app est bâtie autour d'une liste d'objets
-  `Pipeline` justement pour pouvoir grandir.
-
-### Licence
-
-MIT — voir [LICENSE](LICENSE).
+MIT — see [LICENSE](LICENSE).
